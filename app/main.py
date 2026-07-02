@@ -7,14 +7,13 @@ from app.utils.validators import validate_file, FileValidationError
 from app.loaders.loader import DataLoader
 from app.profiling.profiler import DataProfiler
 from app.services.summary_service import SummaryService
-from app.services.query_service import QueryService
 from app.services.hybrid_engine import HybridQueryEngine
+from app.services.viz_service import VisualizationService
 from app.rag.document_creator import DocumentCreator
 from app.rag.chunking import ChunkingService
 from app.rag.embeddings import EmbeddingService
 from app.rag.vectorstore import VectorStoreService
 from app.chat.manager import ChatManager
-from app.memory.memory import ConversationMemory
 
 setup_logger(settings.debug)
 
@@ -28,6 +27,7 @@ def init_session():
         st.session_state.profile = None
         st.session_state.summary = None
         st.session_state.vectorstore = None
+        st.session_state.processed = False
 
 
 def load_and_process(uploaded_file) -> str | None:
@@ -42,7 +42,7 @@ def load_and_process(uploaded_file) -> str | None:
         df = loader.load(temp_path)
 
         profiler = DataProfiler(df)
-        profile = profiler.profile()
+        profile = profiler.profile(uploaded_file.name)
 
         doc_creator = DocumentCreator()
         docs = doc_creator.create(df, uploaded_file.name)
@@ -63,13 +63,14 @@ def load_and_process(uploaded_file) -> str | None:
         st.session_state.summary = summary
         st.session_state.vectorstore = vectorstore
         st.session_state.chat_manager = ChatManager()
+        st.session_state.processed = True
 
         return summary
 
     except FileValidationError as e:
         return f"**Validation error:** {e}"
     except Exception as e:
-        return f"**Error:** {e}"
+        return f"**Error:** {str(e)}"
 
 
 def handle_question(question: str) -> str:
@@ -79,6 +80,15 @@ def handle_question(question: str) -> str:
     vectorstore = st.session_state.vectorstore
     chat_manager = st.session_state.chat_manager
 
+    if ("chart" in question.lower() or "plot" in question.lower()
+            or "visualize" in question.lower() or "graph" in question.lower()
+            or "histogram" in question.lower() or "bar" == question.lower().split()[:1]):
+        viz = VisualizationService(df, profile)
+        img, explanation = viz.generate(question)
+        if img:
+            st.session_state["pending_chart"] = img
+        return explanation or "Could not generate that chart. Try: 'bar chart of [column]'"
+
     engine = HybridQueryEngine(
         df=df,
         profile=profile,
@@ -87,14 +97,14 @@ def handle_question(question: str) -> str:
         memory=chat_manager.memory,
     )
 
-    response = engine.answer(question)
-    return response
+    return engine.answer(question)
 
 
 st.set_page_config(page_title=settings.app_name, layout="wide")
 init_session()
 
 st.title("chat with your dataset")
+st.caption("Upload CSV, Excel, JSON, or Parquet. Ask questions. Get answers.")
 
 with st.sidebar:
     st.header("upload")
@@ -107,7 +117,7 @@ with st.sidebar:
         if st.session_state.filename != uploaded.name:
             with st.spinner("processing..."):
                 result = load_and_process(uploaded)
-            if result.startswith("**Error") or result.startswith("**Validation"):
+            if result and (result.startswith("**Error") or result.startswith("**Validation")):
                 st.error(result)
             else:
                 st.success(f"loaded **{uploaded.name}**")
@@ -119,7 +129,7 @@ with st.sidebar:
             cols[1].metric("columns", profile.shape[1])
             cols[2].metric("file", st.session_state.filename)
 
-            with st.expander("preview"):
+            with st.expander("data preview"):
                 st.dataframe(st.session_state.df.head(10), use_container_width=True)
 
             with st.expander("data profile"):
@@ -137,6 +147,10 @@ for msg in st.session_state.chat_manager.memory.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
+if "pending_chart" in st.session_state and st.session_state.pending_chart:
+    st.image(st.session_state.pending_chart)
+    st.session_state.pending_chart = None
+
 if prompt := st.chat_input("ask about your data..."):
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -146,6 +160,6 @@ if prompt := st.chat_input("ask about your data..."):
             answer = handle_question(prompt)
         st.markdown(answer)
 
-    st.session_state.chat_manager.memory.add_message("user", prompt)
-    st.session_state.chat_manager.memory.add_message("assistant", answer)
+    st.session_state.chat_manager.add_user_message(prompt)
+    st.session_state.chat_manager.add_assistant_message(answer)
     st.rerun()
