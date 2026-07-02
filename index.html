@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>csv chat</title>
+<style>
+  :root {
+    --bg: #faf8f5;
+    --surface: #ffffff;
+    --surface-hover: #f5f3ef;
+    --text: #1c1917;
+    --text-secondary: #78716c;
+    --border: #e7e5e4;
+    --accent: #d97706;
+    --accent-soft: #fef3c7;
+    --accent-hover: #b45309;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06);
+    --radius: 12px;
+    --font: system-ui, -apple-system, sans-serif;
+    --mono: "SF Mono", "Cascadia Code", "JetBrains Mono", monospace;
+  }
+
+  [data-theme="dark"] {
+    --bg: #18181b;
+    --surface: #27272a;
+    --surface-hover: #3f3f46;
+    --text: #fafaf9;
+    --text-secondary: #a1a1aa;
+    --border: #3f3f46;
+    --accent: #f59e0b;
+    --accent-soft: #451a03;
+    --accent-hover: #fbbf24;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    transition: background 0.3s, color 0.3s;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+  }
+
+  .app { width: 100%; max-width: 960px; padding: 48px 24px; }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 48px;
+  }
+
+  .logo {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo span { color: var(--accent); }
+
+  .theme-toggle {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--text);
+    transition: background 0.2s, border-color 0.2s;
+  }
+
+  .theme-toggle:hover {
+    background: var(--surface-hover);
+    border-color: var(--accent);
+  }
+
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 32px;
+  }
+
+  .upload-zone:hover,
+  .upload-zone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .upload-zone .icon { font-size: 32px; margin-bottom: 12px; display: block; }
+  .upload-zone .label { font-size: 15px; font-weight: 500; color: var(--text); }
+  .upload-zone .hint { font-size: 13px; color: var(--text-secondary); margin-top: 6px; }
+  .upload-zone input { display: none; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    transition: background 0.2s;
+  }
+
+  .stat-card .value {
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+  }
+
+  .stat-card .label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  .section-title {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+  }
+
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+    margin-bottom: 32px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  .chat-area {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .chat-messages {
+    padding: 20px;
+    max-height: 420px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .msg {
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    line-height: 1.6;
+    animation: fadeIn 0.25s ease;
+  }
+
+  .msg.user {
+    background: var(--accent);
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg.bot {
+    background: var(--bg);
+    color: var(--text);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .msg table {
+    margin: 8px 0;
+    font-size: 12px;
+  }
+
+  .msg code {
+    background: var(--surface-hover);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .chat-input-wrap {
+    display: flex;
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    gap: 8px;
+    background: var(--surface);
+  }
+
+  .chat-input-wrap input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 14px;
+    color: var(--text);
+    font-family: var(--font);
+  }
+
+  .chat-input-wrap input::placeholder { color: var(--text-secondary); }
+
+  .chat-input-wrap button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-family: var(--font);
+    white-space: nowrap;
+  }
+
+  .chat-input-wrap button:hover { background: var(--accent-hover); }
+  .chat-input-wrap button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .typing {
+    display: flex;
+    gap: 4px;
+    padding: 4px 0;
+    align-items: center;
+  }
+
+  .typing span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+    animation: bounce 1.2s infinite;
+  }
+
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 80px 24px;
+    color: var(--text-secondary);
+  }
+
+  .empty-state .icon { font-size: 48px; margin-bottom: 16px; display: block; }
+  .empty-state .title { font-size: 18px; font-weight: 500; color: var(--text); margin-bottom: 8px; }
+  .empty-state .desc { font-size: 14px; line-height: 1.6; max-width: 400px; margin: 0 auto; }
+
+  @media (max-width: 640px) {
+    .app { padding: 24px 16px; }
+    .stats { grid-template-columns: 1fr; }
+    .msg { max-width: 100%; }
+    .header { margin-bottom: 32px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      csv<span>chat</span>
+    </div>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+      <span id="themeIcon">&#9681;</span>
+    </button>
+  </div>
+
+  <div class="upload-zone" id="uploadZone">
+    <span class="icon">&#128196;</span>
+    <div class="label">Drop your CSV here or click to browse</div>
+    <div class="hint">.csv files only</div>
+    <input type="file" id="fileInput" accept=".csv">
+  </div>
+
+  <div class="stats" id="stats" style="display:none">
+    <div class="stat-card">
+      <div class="value" id="statRows">0</div>
+      <div class="label">Rows</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="statCols">0</div>
+      <div class="label">Columns</div>
+    </div>
+    <div class="stat-card">
+      <div class="value" id="statName">—</div>
+      <div class="label">File</div>
+    </div>
+  </div>
+
+  <div id="chatSection" style="display:none">
+    <div class="chat-area">
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input-wrap">
+        <input type="text" id="chatInput" placeholder="ask about your data..." autocomplete="off">
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="empty-state" id="emptyState">
+    <span class="icon">&#128202;</span>
+    <div class="title">No dataset loaded</div>
+    <div class="desc">Upload a CSV file. The AI reads it, summarizes what's inside, then you can ask questions conversationally.</div>
+  </div>
+</div>
+
+<script>
+  const themeToggle = document.getElementById('themeToggle');
+  const themeIcon = document.getElementById('themeIcon');
+
+  themeToggle.addEventListener('click', () => {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    themeIcon.innerHTML = next === 'dark' ? '&#9681;' : '&#9790;';
+    localStorage.setItem('theme', next);
+  });
+
+  const saved = localStorage.getItem('theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+    themeIcon.innerHTML = saved === 'dark' ? '&#9681;' : '&#9790;';
+  }
+
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput = document.getElementById('fileInput');
+  const stats = document.getElementById('stats');
+  const chatSection = document.getElementById('chatSection');
+  const emptyState = document.getElementById('emptyState');
+  const chatMessages = document.getElementById('chatMessages');
+  const chatInput = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const statRows = document.getElementById('statRows');
+  const statCols = document.getElementById('statCols');
+  const statName = document.getElementById('statName');
+
+  let currentData = null;
+  let headers = [];
+
+  uploadZone.addEventListener('click', () => fileInput.click());
+
+  uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+  });
+
+  uploadZone.addEventListener('dragleave', () => {
+    uploadZone.classList.remove('dragover');
+  });
+
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file.name.endsWith('.csv')) {
+      alert('Please upload a .csv file');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) { alert('CSV needs headers + data'); return; }
+
+      headers = parseCSVLine(lines[0]);
+      const rows = lines.slice(1).map(parseCSVLine);
+      currentData = { headers, rows };
+
+      statRows.textContent = rows.length;
+      statCols.textContent = headers.length;
+      statName.textContent = file.name;
+      stats.style.display = 'grid';
+
+      chatMessages.innerHTML = '';
+      chatSection.style.display = 'block';
+      emptyState.style.display = 'none';
+
+      // auto-summary on load
+      const summary = describeDataset(headers, rows);
+      addBotMsg('**' + file.name + '** loaded. Here\'s what I see:\n\n' + summary);
+    };
+    reader.readAsText(file);
+  }
+
+  function parseCSVLine(line) {
+    const result = [];
+    let cur = '';
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function describeDataset(headers, rows) {
+    const n = rows.length;
+    const c = headers.length;
+    let desc = 'This dataset has **' + n + '** rows and **' + c + '** columns.\n\n';
+    desc += '**Columns:** ' + headers.join(', ') + '\n\n';
+
+    // sample a few values for first 3 columns
+    const sampleCols = headers.slice(0, 3);
+    desc += '**Sample values:**\n';
+    sampleCols.forEach(h => {
+      const idx = headers.indexOf(h);
+      const vals = rows.slice(0, 5).map(r => r[idx] || '—').join(', ');
+      desc += '- *' + h + ':* ' + vals + '\n';
+    });
+
+    // detect if any numeric columns
+    const numericCols = headers.filter(h => {
+      const idx = headers.indexOf(h);
+      return rows.some(r => r[idx] && !isNaN(parseFloat(r[idx].replace(/[$,]/g, ''))));
+    });
+
+    if (numericCols.length > 0) {
+      desc += '\n**Numeric columns:** ' + numericCols.join(', ') + '\n';
+      numericCols.forEach(h => {
+        const idx = headers.indexOf(h);
+        const vals = rows.map(r => parseFloat(r[idx].replace(/[$,]/g, '')) || 0);
+        const avg = (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(1);
+        const max = Math.max(...vals).toFixed(1);
+        const min = Math.min(...vals).toFixed(1);
+        desc += '- *' + h + '* — avg: ' + avg + ', max: ' + max + ', min: ' + min + '\n';
+      });
+    }
+
+    // count nulls
+    const nullCounts = headers.map(h => {
+      const idx = headers.indexOf(h);
+      return rows.filter(r => !r[idx] || r[idx] === '').length;
+    });
+    if (nullCounts.some(n => n > 0)) {
+      desc += '\n**Missing values:**\n';
+      headers.forEach((h, i) => {
+        if (nullCounts[i] > 0) desc += '- *' + h + '*: ' + nullCounts[i] + ' missing\n';
+      });
+    }
+
+    desc += '\nAsk me anything — filter, compare, count, or explore the data.';
+    return desc;
+  }
+
+  function answerQuery(query, headers, rows) {
+    const q = query.toLowerCase().trim();
+
+    // row count
+    if (/how many|total.*rows|count.*rows/.test(q)) {
+      return '**' + rows.length + '** total rows.';
+    }
+
+    // columns
+    if (/what.*columns|list.*columns|show.*columns/.test(q)) {
+      return '**' + headers.length + ' columns:** ' + headers.join(', ');
+    }
+
+    // filter: column > value
+    const greater = q.match(/(\w+)\s*(>|greater than|more than|above)\s*(\d+\.?\d*)/i);
+    if (greater) {
+      const col = findCol(greater[1], headers);
+      if (col !== -1) {
+        const val = parseFloat(greater[3]);
+        const filtered = rows.filter(r => parseFloat(r[col].replace(/[$,]/g, '')) > val);
+        if (filtered.length === 0) return 'No rows where **' + headers[col] + ' > ' + val + '**.';
+        return renderTableResponse(headers, filtered.slice(0, 10), filtered.length);
+      }
+    }
+
+    // filter: column < value
+    const less = q.match(/(\w+)\s*(<|less than|below|under)\s*(\d+\.?\d*)/i);
+    if (less) {
+      const col = findCol(less[1], headers);
+      if (col !== -1) {
+        const val = parseFloat(less[3]);
+        const filtered = rows.filter(r => parseFloat(r[col].replace(/[$,]/g, '')) < val);
+        if (filtered.length === 0) return 'No rows where **' + headers[col] + ' < ' + val + '**.';
+        return renderTableResponse(headers, filtered.slice(0, 10), filtered.length);
+      }
+    }
+
+    // top n
+    const top = q.match(/(?:top|first|show)\s*(\d+)/i);
+    if (top) {
+      const n = parseInt(top[1]);
+      const sample = rows.slice(0, Math.min(n, 20));
+      return renderTableResponse(headers, sample, rows.length);
+    }
+
+    // search: find value in any column
+    const search = q.match(/(?:find|search|show|where)\s*(.+)/i);
+    if (search) {
+      const term = search[1].toLowerCase().trim();
+      const matched = rows.filter(r => r.some(c => c.toLowerCase().includes(term)));
+      if (matched.length > 0) return renderTableResponse(headers, matched.slice(0, 10), matched.length);
+    }
+
+    // average of a column
+    const avg = q.match(/average|mean|avg/i);
+    if (avg) {
+      const numCols = headers.filter(h => {
+        const idx = headers.indexOf(h);
+        return rows.some(r => !isNaN(parseFloat(r[idx].replace(/[$,]/g, ''))));
+      });
+      if (numCols.length > 0) {
+        let out = '**Averages:**\n';
+        numCols.forEach(h => {
+          const idx = headers.indexOf(h);
+          const vals = rows.map(r => parseFloat(r[idx].replace(/[$,]/g, '')) || 0);
+          const mean = (vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(2);
+          out += '- ' + h + ': ' + mean + '\n';
+        });
+        return out;
+      }
+    }
+
+    // fallback - give a helpful summary
+    return 'Got **' + rows.length + '** rows, **' + headers.length + '** columns: ' + headers.join(', ') + '. Try:\n- *"top 5 rows"*\n- *"find [something]"*\n- *"average [column]"*\n- *"[column] > 100"*';
+  }
+
+  function findCol(name, headers) {
+    const lower = name.toLowerCase();
+    return headers.findIndex(h => h.toLowerCase().includes(lower));
+  }
+
+  function renderTableResponse(headers, rows, total) {
+    let html = '<table><thead><tr>';
+    headers.forEach(h => { html += '<th>' + esc(h) + '</th>'; });
+    html += '</tr></thead><tbody>';
+    rows.forEach(r => {
+      html += '<tr>' + r.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>';
+    });
+    html += '</tbody></table>';
+    if (rows.length < total) html += '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px">+ ' + (total - rows.length) + ' more</div>';
+    return html;
+  }
+
+  function addBotMsg(content) {
+    const div = document.createElement('div');
+    div.className = 'msg bot';
+    div.innerHTML = content.replace(/\n/g, '<br>');
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function addUserMsg(content) {
+    const div = document.createElement('div');
+    div.className = 'msg user';
+    div.textContent = content;
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function showTyping() {
+    const div = document.createElement('div');
+    div.className = 'msg bot';
+    div.id = 'typingIndicator';
+    div.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+    chatMessages.appendChild(div);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function hideTyping() {
+    const el = document.getElementById('typingIndicator');
+    if (el) el.remove();
+  }
+
+  function sendMessage() {
+    const q = chatInput.value.trim();
+    if (!q || !currentData) return;
+    addUserMsg(q);
+    chatInput.value = '';
+    sendBtn.disabled = true;
+    sendBtn.textContent = '...';
+    showTyping();
+
+    setTimeout(() => {
+      hideTyping();
+      const reply = answerQuery(q, currentData.headers, currentData.rows);
+      addBotMsg(reply);
+      sendBtn.disabled = false;
+      sendBtn.textContent = 'Send';
+    }, 400);
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Env
+.env
+*.env.local
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# Data
+data/*
+!data/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/
+
+# Vector store indexes
+*.faiss
+*.pkl
+
+# Chroma
+chroma_data/
+
+# Models
+models/
